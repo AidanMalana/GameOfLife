@@ -1,5 +1,6 @@
 #include <math.h>
 #include <raylib.h>
+#include <raymath.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -9,25 +10,40 @@ typedef struct Cell {
 } Cell;
 
 void DrawGrid2D(Vector2 dimensions, int spacing) {
-  for (int i = 0; i < dimensions.x / spacing; i++) {
-    DrawLine(i * spacing, 0, i * spacing,
-             floor(dimensions.y / spacing) * spacing, WHITE);
+  for (int i = 0; i <= dimensions.x / spacing; i++) {
+    DrawLine(i * spacing, 0, i * spacing, dimensions.y, WHITE);
   }
-  for (int i = 0; i < dimensions.y / spacing; i++) {
+  for (int i = 0; i <= dimensions.y / spacing; i++) {
     DrawLine(0, i * spacing, floor(dimensions.x / spacing) * spacing,
              i * spacing, WHITE);
   }
 }
 
-const Vector2 screenDimensions = {640, 360};
+Vector2 screenDimensions = {640, 360};
 
 int main(void) {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   SetTargetFPS(10);
   InitWindow(screenDimensions.x, screenDimensions.y, "Conway's Game of Life");
 
+  double virtRatio = screenDimensions.x / 640 > screenDimensions.y / 360
+                         ? screenDimensions.y / 360
+                         : screenDimensions.x / 640;
+  virtRatio = floor(virtRatio);
+  virtRatio = virtRatio < 1 ? 1 : virtRatio;
+
+  Vector2 offset = {screenDimensions.x - (screenDimensions.x * virtRatio),
+                    screenDimensions.y - (screenDimensions.y * virtRatio)};
+  offset.x = offset.x / 2;
+  offset.y = offset.y / 2;
+
+  Camera2D cam = {
+      .offset = offset, .target = {0, 0}, .zoom = virtRatio, .rotation = 0};
+
   int gridWidth = (int)floor(screenDimensions.x / 8);
   int gridHeight = (int)floor(screenDimensions.y / 8);
+
+  bool drawGrid = true;
 
   Cell cells[gridWidth][gridHeight];
 
@@ -41,13 +57,30 @@ int main(void) {
   int simRunning = false;
 
   while (!WindowShouldClose()) {
+    if (IsWindowResized()) {
+      screenDimensions.x = GetScreenWidth();
+      screenDimensions.y = GetScreenHeight();
+      virtRatio = screenDimensions.x / 640 > screenDimensions.y / 360
+                      ? screenDimensions.y / 360
+                      : screenDimensions.x / 640;
+      virtRatio = floor(virtRatio);
+      virtRatio = virtRatio < 1 ? 1 : virtRatio;
+      cam.zoom = virtRatio;
+
+      offset = (Vector2){(screenDimensions.x / 2) - (640 * virtRatio / 2),
+                         (screenDimensions.y / 2) - (360 * virtRatio / 2)};
+      cam.offset.x = offset.x;
+      cam.offset.y = offset.y;
+    }
     if (!simRunning) {
       if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        Vector2 pos = GetMousePosition();
+        Vector2 pos = GetScreenToWorld2D(GetMousePosition(), cam);
         pos.x = floor(pos.x / 8);
         pos.y = floor(pos.y / 8);
-        cells[(int)pos.x][(int)pos.y].alive =
-            !cells[(int)pos.x][(int)pos.y].alive;
+        if (pos.x < 80 && pos.y < 45) {
+          cells[(int)pos.x][(int)pos.y].alive =
+              !cells[(int)pos.x][(int)pos.y].alive;
+        }
       }
     } else { // The sim IS running
              // Create tmp variable so all updates happen "at once"
@@ -62,7 +95,7 @@ int main(void) {
           Cell c = cells[i][j];
           int sumLivingNeighbors = 0;
 
-          if (i < gridWidth) {
+          if (i + 1 < gridWidth) {
 
             if (j < gridHeight && cells[i + 1][j + 1].alive)
               sumLivingNeighbors++;
@@ -112,11 +145,30 @@ int main(void) {
       simRunning = !simRunning;
     }
 
+    // Toggle grid
+    if (IsKeyReleased(KEY_G)) {
+      drawGrid = !drawGrid;
+    }
+
+    // Clear grid
+    if (IsKeyReleased(KEY_C) || IsKeyReleased(KEY_BACKSPACE)) {
+      for (int i = 0; i < gridWidth; i++) {
+        for (int j = 0; j < gridHeight; j++) {
+          cells[i][j].alive = false;
+        }
+      }
+    }
+
     // Draw
     BeginDrawing();
-    // DrawGrid2D(screenDimensions, 8);
+    ClearBackground(BLACK);
+    BeginMode2D(cam);
+    if (drawGrid)
+      DrawGrid2D((Vector2){640, 360}, 8);
     if (simRunning) {
-      DrawText("running", 0, 0, 24, BLUE);
+      DrawText("Running", 0, 0, 24, BLUE);
+    } else {
+      DrawText("Editing", 0, 0, 24, RED);
     }
     for (int i = 0; i < gridWidth; i++) {
       for (int j = 0; j < gridHeight; j++) {
@@ -126,7 +178,7 @@ int main(void) {
         }
       }
     }
-    ClearBackground(BLACK);
+    EndMode2D();
     EndDrawing();
   }
 
