@@ -5,7 +5,6 @@
 
 typedef struct Cell {
   Rectangle rect;
-  bool neighbors[8];
   bool alive;
 } Cell;
 
@@ -24,7 +23,7 @@ const Vector2 screenDimensions = {640, 360};
 
 int main(void) {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-  SetTargetFPS(60);
+  SetTargetFPS(10);
   InitWindow(screenDimensions.x, screenDimensions.y, "Conway's Game of Life");
 
   int gridWidth = (int)floor(screenDimensions.x / 8);
@@ -35,9 +34,7 @@ int main(void) {
   for (int i = 0; i < gridWidth; i++) {
     for (int j = 0; j < gridHeight; j++) {
       cells[i][j].rect = (Rectangle){i * 8, j * 8, 8, 8};
-      for (int k = 0; k < 9; k++) {
-        *(cells[i][j].neighbors + k) = false;
-      }
+      cells[i][j].alive = false;
     }
   }
 
@@ -51,26 +48,76 @@ int main(void) {
         pos.y = floor(pos.y / 8);
         cells[(int)pos.x][(int)pos.y].alive =
             !cells[(int)pos.x][(int)pos.y].alive;
-        if (pos.x + 1 < gridWidth) {
-          if (pos.y + 1 < gridHeight) {
-            cells[(int)pos.x][(int)pos.y].neighbors[0] =
-                cells[(int)pos.x][(int)pos.y].alive;
-          }
-          if (pos.y - 1 > 0) {
-          }
+      }
+    } else { // The sim IS running
+             // Create tmp variable so all updates happen "at once"
+      Cell tmp[gridWidth][gridHeight];
+      for (int i = 0; i < gridWidth; i++) {
+        for (int j = 0; j < gridHeight; j++) {
+          tmp[i][j] = cells[i][j];
         }
-        if (pos.x - 1 > 0) {
-          if (pos.y + 1 < gridHeight) {
+      }
+      for (int i = 0; i < gridWidth; i++) {
+        for (int j = 0; j < gridHeight; j++) {
+          Cell c = cells[i][j];
+          int sumLivingNeighbors = 0;
+
+          if (i < gridWidth) {
+
+            if (j < gridHeight && cells[i + 1][j + 1].alive)
+              sumLivingNeighbors++;
+            if (j > 0 && cells[i + 1][j - 1].alive)
+              sumLivingNeighbors++;
+            if (cells[i + 1][j].alive)
+              sumLivingNeighbors++;
           }
-          if (pos.y - 1 > 0) {
+          if (i > 0) {
+
+            if (j < gridHeight && cells[i - 1][j + 1].alive)
+              sumLivingNeighbors++;
+            if (j > 0 && cells[i - 1][j - 1].alive)
+              sumLivingNeighbors++;
+            if (cells[i - 1][j].alive)
+              sumLivingNeighbors++;
           }
+          if (j < gridHeight && cells[i][j + 1].alive)
+            sumLivingNeighbors++;
+          if (j > 0 && cells[i][j - 1].alive)
+            sumLivingNeighbors++;
+
+          if (sumLivingNeighbors < 2) {
+            c.alive = false;
+          }
+          if (sumLivingNeighbors > 3) {
+            c.alive = false;
+          }
+          if (sumLivingNeighbors == 3) {
+            c.alive = true;
+          }
+
+          tmp[i][j] = c;
         }
-        // cells[(int)pos.x][(int)pos.y].neighbors[0] =
-        // cells[(int)pos.x][(int)pos.y].alive;
+      }
+
+      // Set cells to tmp
+      for (int i = 0; i < gridWidth; i++) {
+        for (int j = 0; j < gridHeight; j++) {
+          cells[i][j] = tmp[i][j];
+        }
       }
     }
+
+    // Toggle sim on/off
+    if (IsKeyReleased(KEY_SPACE)) {
+      simRunning = !simRunning;
+    }
+
+    // Draw
     BeginDrawing();
-    DrawGrid2D(screenDimensions, 8);
+    // DrawGrid2D(screenDimensions, 8);
+    if (simRunning) {
+      DrawText("running", 0, 0, 24, BLUE);
+    }
     for (int i = 0; i < gridWidth; i++) {
       for (int j = 0; j < gridHeight; j++) {
         if (cells[i][j].alive) {

@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall
+CFLAGS=-Wall -O0
 game:
 	echo "Compiling the game"
 	$(CC) $(CFLAGS) main.c -lraylib -lm -o bin/game
